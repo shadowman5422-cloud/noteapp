@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#4a90d9">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>নোট প্যাড</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #fdf6e3, #eef2f7);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin: 0;
+  }
+  .lock-btn {
+    position: absolute;
+    right: 0;
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #4a90d9;
+    padding: 6px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+  }
+  input[type="text"], input[type="password"], textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 15px;
+    margin-bottom: 10px;
+    font-family: inherit;
+  }
+  textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+  button {
+    background: #4a90d9;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: #3a7bc0; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-danger { background: #e05555; }
+  .btn-danger:hover { background: #c94444; }
+  .btn-secondary { background: #999; }
+  .btn-secondary:hover { background: #777; }
+
+  .lock-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #444;
+  }
+  .lock-toggle-row input[type="checkbox"] { width: 18px; height: 18px; margin: 0; }
+  #notePwWrap { display: none; }
+
+  .search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .search-box input { margin-bottom: 0; flex: 1; }
+
+  .note-item {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    cursor: pointer;
+    border-left: 4px solid #4a90d9;
+    transition: transform 0.15s;
+  }
+  .note-item.locked { border-left-color: #e0a840; }
+  .note-item:hover { transform: translateX(3px); }
+  .note-title {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 16px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .note-title.expanded {
+    white-space: normal;
+    word-break: break-word;
+  }
+  .note-preview {
+    color: #666;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .note-date {
+    color: #aaa;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .empty-msg {
+    text-align: center;
+    color: #999;
+    padding: 30px;
+  }
+  .status-msg {
+    text-align: center;
+    color: #4a90d9;
+    font-size: 14px;
+    margin-bottom: 10px;
+    min-height: 18px;
+  }
+
+  /* Overlay (app lock + note password prompts) */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #fdf6e3, #eef2f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .overlay-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 26px 22px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+  }
+  .overlay-card h2 {
+    color: #2c3e50;
+    margin-top: 0;
+  }
+  .overlay-card p {
+    color: #777;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  .overlay-error {
+    color: #e05555;
+    font-size: 13px;
+    min-height: 18px;
+    margin-bottom: 6px;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- App lock overlay -->
+<div class="overlay" id="appLockOverlay">
+  <div class="overlay-card">
+    <h2 id="appLockTitle">🔒 অ্যাপ আনলক করুন</h2>
+    <p id="appLockDesc">চালিয়ে যেতে পাসওয়ার্ড দিন</p>
+    <input type="password" id="appLockInput" placeholder="পাসওয়ার্ড">
+    <input type="password" id="appLockConfirmInput" class="hidden" placeholder="পাসওয়ার্ড আবার লিখুন">
+    <div class="overlay-error" id="appLockError"></div>
+    <button style="width:100%" onclick="handleAppLockSubmit()">✅ ঠিক আছে</button>
+  </div>
+</div>
+
+<!-- Note password overlay -->
+<div class="overlay hidden" id="notePwOverlay">
+  <div class="overlay-card">
+    <h2>🔒 নোটটি সুরক্ষিত</h2>
+    <p>এই নোটটি দেখতে পাসওয়ার্ড দিন</p>
+    <input type="password" id="notePwPromptInput" placeholder="পাসওয়ার্ড">
+    <div class="overlay-error" id="notePwError"></div>
+    <div class="btn-row">
+      <button style="flex:1" onclick="submitNotePwPrompt()">✅ খুলুন</button>
+      <button style="flex:1" class="btn-secondary" onclick="closeNotePwPrompt()">বাতিল</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="header-row">
+    <h1>📝 আমার নোট প্যাড</h1>
+    <button class="lock-btn" title="অ্যাপ লক করুন" onclick="lockApp()">🔒</button>
+  </div>
+
+  <div class="card">
+    <input type="text" id="noteName" placeholder="নোটের নাম লিখুন...">
+    <textarea id="noteContent" placeholder="এখানে লিখুন..."></textarea>
+
+    <div class="lock-toggle-row">
+      <input type="checkbox" id="noteLockToggle" onchange="toggleNotePwField()">
+      <label for="noteLockToggle">এই নোটটি পাসওয়ার্ড দিয়ে সুরক্ষিত করুন (ঐচ্ছিক)</label>
+    </div>
+    <div id="notePwWrap">
+      <input type="password" id="notePwField" placeholder="নোটের পাসওয়ার্ড দিন">
+    </div>
+
+    <div class="btn-row">
+      <button onclick="saveNote()">💾 Save করুন</button>
+      <button class="btn-secondary" onclick="clearForm()">নতুন নোট</button>
+    </div>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="🔍 নাম দিয়ে খুঁজুন..." oninput="renderNotes()">
+  </div>
+
+  <div class="status-msg" id="statusMsg"></div>
+
+  <div id="notesList"></div>
+</div>
+
+<script>
+  let allNotes = {}; // key -> {name, content, date, pwHash?}
+  let editingKey = null;
+  let expandedTitles = new Set();
+  let pendingUnlockKey = null; // note awaiting password before opening
+  const STORAGE_KEY = 'my_notepad_notes';
+  const APP_PW_KEY = 'app_password_hash';
+
+  // ---------- helpers ----------
+  async function sha256(text) {
+    const enc = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function showStatus(msg) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    setTimeout(() => { el.textContent = ''; }, 2000);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  // ---------- app lock ----------
+  function isAppPasswordSet() {
+    return !!localStorage.getItem(APP_PW_KEY);
+  }
+
+  function initAppLock() {
+    const overlay = document.getElementById('appLockOverlay');
+    const confirmInput = document.getElementById('appLockConfirmInput');
+    if (isAppPasswordSet()) {
+      document.getElementById('appLockTitle').textContent = '🔒 অ্যাপ আনলক করুন';
+      document.getElementById('appLockDesc').textContent = 'চালিয়ে যেতে পাসওয়ার্ড দিন';
+      confirmInput.classList.add('hidden');
+    } else {
+      document.getElementById('appLockTitle').textContent = '🔒 একটি পাসওয়ার্ড সেট করুন';
+      document.getElementById('appLockDesc').textContent = 'অ্যাপে প্রবেশের জন্য একটি পাসওয়ার্ড তৈরি করুন';
+      confirmInput.classList.remove('hidden');
+    }
+    document.getElementById('appLockInput').value = '';
+    confirmInput.value = '';
+    document.getElementById('appLockError').textContent = '';
+    overlay.classList.remove('hidden');
+    setTimeout(() => document.getElementById('appLockInput').focus(), 100);
+  }
+
+  async function handleAppLockSubmit() {
+    const pw = document.getElementById('appLockInput').value;
+    const errEl = document.getElementById('appLockError');
+    if (!pw) { errEl.textContent = 'পাসওয়ার্ড দিন'; return; }
+
+    if (isAppPasswordSet()) {
+      const hash = await sha256(pw);
+      if (hash === localStorage.getItem(APP_PW_KEY)) {
+        document.getElementById('appLockOverlay').classList.add('hidden');
+        loadNotes();
+      } else {
+        errEl.textContent = '❌ ভুল পাসওয়ার্ড';
+      }
+    } else {
+      const confirmPw = document.getElementById('appLockConfirmInput').value;
+      if (pw.length < 4) { errEl.textContent = 'কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন'; return; }
+      if (pw !== confirmPw) { errEl.textContent = 'দুটি পাসওয়ার্ড মিলছে না'; return; }
+      const hash = await sha256(pw);
+      localStorage.setItem(APP_PW_KEY, hash);
+      document.getElementById('appLockOverlay').classList.add('hidden');
+      showStatus('✅ পাসওয়ার্ড সেট হয়েছে');
+      loadNotes();
+    }
+  }
+
+  function lockApp() {
+    initAppLock();
+  }
+
+  // allow Enter key to submit lock forms
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (!document.getElementById('appLockOverlay').classList.contains('hidden')) {
+      handleAppLockSubmit();
+    } else if (!document.getElementById('notePwOverlay').classList.contains('hidden')) {
+      submitNotePwPrompt();
+    }
+  });
+
+  // ---------- notes storage ----------
+  function loadNotes() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      allNotes = raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      console.error('load error', e);
+      allNotes = {};
+    }
+    renderNotes();
+  }
+
+  function persistNotes() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allNotes));
+  }
+
+  function toggleNotePwField() {
+    const checked = document.getElementById('noteLockToggle').checked;
+    document.getElementById('notePwWrap').style.display = checked ? 'block' : 'none';
+  }
+
+  async function saveNote() {
+    const name = document.getElementById('noteName').value.trim();
+    const content = document.getElementById('noteContent').value;
+    const wantLock = document.getElementById('noteLockToggle').checked;
+    const pwVal = document.getElementById('notePwField').value;
+
+    if (!name) {
+      showStatus('⚠️ নোটের নাম দিন');
+      return;
+    }
+    if (wantLock && !pwVal) {
+      showStatus('⚠️ নোটের পাসওয়ার্ড দিন');
+      return;
+    }
+
+    const key = editingKey || ('note_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
+    const noteData = {
+      name: name,
+      content: content,
+      date: new Date().toLocaleString('bn-BD')
+    };
+    if (wantLock) {
+      noteData.pwHash = await sha256(pwVal);
+    } else if (editingKey && allNotes[editingKey] && allNotes[editingKey].pwHash && !wantLock) {
+      // user unchecked lock on an existing note -> remove password
+      // (no pwHash added, so it stays unlocked)
+    }
+
+    try {
+      allNotes[key] = noteData;
+      persistNotes();
+      showStatus('✅ Save হয়েছে!');
+      clearForm();
+      renderNotes();
+    } catch (e) {
+      console.error(e);
+      showStatus('❌ Save ব্যর্থ হয়েছে');
+    }
+  }
+
+  function clearForm() {
+    editingKey = null;
+    document.getElementById('noteName').value = '';
+    document.getElementById('noteContent').value = '';
+    document.getElementById('noteLockToggle').checked = false;
+    document.getElementById('notePwField').value = '';
+    document.getElementById('notePwWrap').style.display = 'none';
+  }
+
+  function openNote(key) {
+    const note = allNotes[key];
+    if (!note) return;
+    if (note.pwHash) {
+      pendingUnlockKey = key;
+      document.getElementById('notePwPromptInput').value = '';
+      document.getElementById('notePwError').textContent = '';
+      document.getElementById('notePwOverlay').classList.remove('hidden');
+      setTimeout(() => document.getElementById('notePwPromptInput').focus(), 100);
+      return;
+    }
+    fillFormWithNote(key);
+  }
+
+  function fillFormWithNote(key) {
+    const note = allNotes[key];
+    editingKey = key;
+    document.getElementById('noteName').value = note.name;
+    document.getElementById('noteContent').value = note.content;
+    document.getElementById('noteLockToggle').checked = !!note.pwHash;
+    document.getElementById('notePwField').value = '';
+    document.getElementById('notePwWrap').style.display = note.pwHash ? 'block' : 'none';
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  async function submitNotePwPrompt() {
+    if (!pendingUnlockKey) return;
+    const pw = document.getElementById('notePwPromptInput').value;
+    const note = allNotes[pendingUnlockKey];
+    if (!pw) { document.getElementById('notePwError').textContent = 'পাসওয়ার্ড দিন'; return; }
+    const hash = await sha256(pw);
+    if (hash === note.pwHash) {
+      const key = pendingUnlockKey;
+      closeNotePwPrompt();
+      fillFormWithNote(key);
+    } else {
+      document.getElementById('notePwError').textContent = '❌ ভুল পাসওয়ার্ড';
+    }
+  }
+
+  function closeNotePwPrompt() {
+    pendingUnlockKey = null;
+    document.getElementById('notePwOverlay').classList.add('hidden');
+  }
+
+  function deleteNote(key, event) {
+    event.stopPropagation();
+    if (!confirm('এই নোটটি ডিলিট করতে চান?')) return;
+    try {
+      delete allNotes[key];
+      persistNotes();
+      if (editingKey === key) clearForm();
+      expandedTitles.delete(key);
+      showStatus('🗑️ ডিলিট হয়েছে');
+      renderNotes();
+    } catch (e) {
+      console.error(e);
+      showStatus('❌ ডিলিট ব্যর্থ হয়েছে');
+    }
+  }
+
+  function toggleTitle(key, event) {
+    event.stopPropagation();
+    if (expandedTitles.has(key)) expandedTitles.delete(key);
+    else expandedTitles.add(key);
+    renderNotes();
+  }
+
+  function renderNotes() {
+    const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+    const listEl = document.getElementById('notesList');
+
+    let keys = Object.keys(allNotes);
+    if (searchTerm) {
+      keys = keys.filter(k => allNotes[k].name.toLowerCase().includes(searchTerm));
+    }
+    keys.sort((a, b) => b.localeCompare(a));
+
+    if (keys.length === 0) {
+      listEl.innerHTML = `<div class="empty-msg">${searchTerm ? 'কোনো নোট পাওয়া যায়নি 😕' : 'এখনো কোনো নোট নেই। উপরে লিখে Save করুন।'}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = keys.map(key => {
+      const note = allNotes[key];
+      const locked = !!note.pwHash;
+      const preview = locked ? '🔒 পাসওয়ার্ড দিয়ে সুরক্ষিত — দেখতে ক্লিক করুন' : (note.content || '').slice(0, 80);
+      const expanded = expandedTitles.has(key);
+      return `
+        <div class="note-item ${locked ? 'locked' : ''}" onclick="openNote('${key}')">
+          <div class="note-title ${expanded ? 'expanded' : ''}" onclick="toggleTitle('${key}', event)">${locked ? '🔒 ' : ''}${escapeHtml(note.name)}</div>
+          <div class="note-preview">${escapeHtml(preview)}${!locked && note.content && note.content.length > 80 ? '...' : ''}</div>
+          <div class="note-date">${note.date || ''}</div>
+          <div class="btn-row" style="margin-top:8px;">
+            <button class="btn-danger" style="padding:5px 12px; font-size:13px;" onclick="deleteNote('${key}', event)">🗑️ Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ---------- boot ----------
+  initAppLock();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.error('SW register failed', err));
+    });
+  }
+</script>
+
+</body>
+</html>
