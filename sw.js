@@ -1,4 +1,4 @@
-const CACHE_NAME = 'note-pad-cache-v2';
+const CACHE_NAME = 'note-pad-cache-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -24,12 +24,29 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const isHtml = req.mode === 'navigate' ||
+    (req.method === 'GET' && req.headers.get('accept') && req.headers.get('accept').includes('text/html'));
+
+  if (isHtml) {
+    // Network-first for the HTML page so updates always show right away.
+    event.respondWith(
+      fetch(req).then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+        return response;
+      }).catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (icons, manifest, etc.)
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        if (event.request.method === 'GET' && response && response.status === 200) {
+    caches.match(req).then((cached) => {
+      return cached || fetch(req).then((response) => {
+        if (req.method === 'GET' && response && response.status === 200) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
         }
         return response;
       }).catch(() => cached);
